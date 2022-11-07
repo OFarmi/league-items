@@ -2,8 +2,8 @@ import Express from 'express'
 import * as http from 'http';
 import CORS from 'cors'
 import { AddressInfo } from 'net'
-import addWinrateRoutes from './src/router';
-import DataGathering from './src/DataGathering';
+import addWinrateRoutes from './router';
+import DataGathering from './DataGathering';
 
 const app = Express()
 app.use(CORS())

@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model champions {
+  name     String     @id(map: "champion_pkey") @db.VarChar(30)
+  winrates winrates[]
+}
+
+model items {
+  id        Int        @id(map: "item_pkey") @db.SmallInt
+  mythic    Boolean?   @default(false)
+  legendary Boolean?   @default(false)
+  name      String?    @unique(map: "item_name_key") @db.VarChar(50)
+  winrates  winrates[]
+}
+
+model winrates {
+  champion  String    @db.VarChar(30)
+  item_id   Int       @db.SmallInt
+  wins      Int       @default(0)
+  losses    Int       @default(0)
+  item_name String    @db.VarChar(50)
+  top       Int       @default(0)
+  jungle    Int       @default(0)
+  middle    Int       @default(0)
+  bottom    Int       @default(0)
+  utility   Int       @default(0)
+  champions champions @relation(fields: [champion], references: [name], onDelete: Cascade, onUpdate: NoAction, map: "winrate_champion_fkey")
+  items     items     @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "winrate_item_fkey")
+
+  @@id([champion, item_id], map: "winrate_pkey")
+}
+
+model matches {
+  id    String @id @db.VarChar(20)
+  patch String @unique @db.VarChar(5)
+}

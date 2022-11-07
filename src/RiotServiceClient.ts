@@ -1,18 +1,37 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios"
+import axiosRetry from 'axios-retry'
 //import { request } from "express";
 require("dotenv")
 
 
 export type MatchDataResponse = {
-    participantIds: string[],
+    metadata: Metadata,
     info: MatchInfo
+}
+
+type Metadata = {
+    participants: string[]
 }
 
 // ranked is queueId 420
 export type MatchInfo = {
-    gameVersion: string,
+    gameVersion: string, //patch
     participants: MatchParticipant[],
-    queueId: number
+    queueId: number //420
+}
+
+export type ItemResponse = {
+    data: Item[]
+}
+
+export type Item = {
+    id: number,
+    name: string,
+    description: string,
+    into: string[],
+    requiredAlly: string,
+    from: string[],
+    tags: string[]
 }
 
 export type MatchParticipant = {
@@ -152,17 +171,69 @@ export type LeagueEntry = {
     hotStreak: boolean*/
 }
 
+const head = {
+    "User-Agent": "axios/1.1.3",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Charset": "application/x-www-form-urlencoded; charset=UTF-8",
+    "Origin": "https://developer.riotgames.com"
+}
 export default class RiotServiceClient {
-    private _axios: AxiosInstance;
+    private _axios_api: AxiosInstance;
+    private _axios_cdn: AxiosInstance;
+    private _axios_api_matches: AxiosInstance
 
     constructor() {
-        this._axios = axios.create({
-            baseURL: "https://na1.api.riotgames.com/lol"
+        // can put X-Riot-Token: API_KEY in header instead of appending it to each link
+        this._axios_api = axios.create({
+            baseURL: "https://na1.api.riotgames.com/lol",
+            headers: {
+                "X-Riot-Token": process.env.RIOT_API_KEY!
+            }
+        })
+
+        this._axios_api_matches = axios.create({
+            baseURL: "https://americas.api.riotgames.com/lol",
+            headers: {
+                "X-Riot-Token": process.env.RIOT_API_KEY!
+            }
+        })
+
+        axiosRetry(this._axios_api, {
+            retries: 3,
+            retryDelay: (retryCount) => {
+                console.log(`retry attempt: ${retryCount}`)
+                return retryCount * 1000;
+            },
+            retryCondition: (error) => {
+                return [429, 500, 503].includes(error.response?.status as number)
+            }
+        })
+
+        axiosRetry(this._axios_api_matches, {
+            retries: 3,
+            retryDelay: (retryCount) => {
+                console.log(`retry attempt: ${retryCount}`)
+                return retryCount * 1000;
+            },
+            retryCondition: (error) => {
+                return [429, 500, 503].includes(error.response?.status as number)
+            }
+        })
+
+        this._axios_cdn = axios.create({
+            baseURL: "https://ddragon.leagueoflegends.com/cdn"
         })
     }
 
-    async getSummonerId(requestData: SummonerIdRequest): Promise<LeagueEntry[]> {
-        const response: AxiosResponse<LeagueEntry[]> = await this._axios.get<LeagueEntry[]>(`/league-exp/v4/entries/${requestData.queue}/${requestData.tier}/${requestData.division}?page=1&api_key=${process.env.RIOT_API_KEY}`)
+
+    async getCurrentPatch(): Promise<string> {
+        let patchCall: AxiosResponse<string[]> = await axios.get<string[]>("https://ddragon.leagueoflegends.com/api/versions.json")
+        return patchCall.data[0]
+    }
+
+    async getSummonerIds(requestData: SummonerIdRequest): Promise<LeagueEntry[]> {
+        const response: AxiosResponse<LeagueEntry[]> = await this._axios_api.get<LeagueEntry[]>(`/league-exp/v4/entries/${requestData.queue}/${requestData.tier}/${requestData.division}?page=1`)
+        //console.log(response.data)
         //response.data[0]
         // CAN CHANGE TO return response.data.map(e => e.summonerId) if want to lower LeagueEntry clutter
         return response.data
@@ -171,19 +242,46 @@ export default class RiotServiceClient {
     
     async getPUUID(summonerId: string): Promise<string> {
         // leaving as AxiosResponse object lets you access the property names
-        const response: AxiosResponse = await this._axios.get(`summoner/v4/summoners/${summonerId}?api_key=${process.env.RIOT_API_KEY}`)
+        const response: AxiosResponse = await this._axios_api.get(`summoner/v4/summoners/${summonerId}`)
         return response.data.puuid
     }
     
     // put list of matches into a set so there are no copies
     async getPlayerMatches(puuid: string): Promise<string[]> {
-        const response: AxiosResponse<string[]> = await this._axios.get<string[]>(`match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20?api_key=${process.env.RIOT_API_KEY}`)
+        const response: AxiosResponse<string[]> = await this._axios_api_matches.get<string[]>(`match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20`)
         return response.data
     }
     
     // get each player from the match, and add into a DB(?) whether it was a win or loss for each given item.
     async getMatchData(matchId: string): Promise<MatchDataResponse> {
-        const response: AxiosResponse<MatchDataResponse> = await this._axios.get<MatchDataResponse>(`match/v5/matches/${matchId}?api_key=${process.env.RIOT_API_KEY}`)
+        const response: AxiosResponse<MatchDataResponse> = await this._axios_api_matches.get<MatchDataResponse>(`match/v5/matches/${matchId}`)
         return response.data
     }
+
+    async getChampionList(patch: string): Promise<string[]> {
+        const response: AxiosResponse = await this._axios_cdn.get(`/${patch + ".1"}/data/en_US/champion.json`)
+        return Object.getOwnPropertyNames(response.data.data)
+    }
+
+    async getItemCodeList(patch: string): Promise<string[]> {
+        const response: AxiosResponse = await this._axios_cdn.get(`/${patch + ".1"}/data/en_US/item.json`)
+        return Object.getOwnPropertyNames(response.data.data)
+    }
+
+    async getItemNameList(patch: string): Promise<string[][]> {
+        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
+        return Object.entries(response.data.data).map(([k, v]) => [k, v.name])
+    }
+
+    async getItemData(patch: string, item: number): Promise<Item> {
+        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
+        const reply = Object.entries(response.data.data).find(([k,v]) => parseInt(k) === item)
+        //console.log(item + " " + reply![1].name)
+        reply![1].id = item
+
+        return reply![1]
+    }
+
+    //unsure if necessary in backend
+    //async getChampionImage(champion: string)
 }
