@@ -4,6 +4,7 @@ import CORS from 'cors'
 import { AddressInfo } from 'net'
 import addWinrateRoutes from './src/router';
 import DataGathering from './src/DataGathering';
+require('dotenv').config()
 
 const app = Express()
 app.use(CORS())

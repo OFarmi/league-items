@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios"
 import axiosRetry from 'axios-retry'
 //import { request } from "express";
-require("dotenv")
+//require("dotenv")
 
 
 export type MatchDataResponse = {
@@ -171,12 +171,7 @@ export type LeagueEntry = {
     hotStreak: boolean*/
 }
 
-const head = {
-    "User-Agent": "axios/1.1.3",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Charset": "application/x-www-form-urlencoded; charset=UTF-8",
-    "Origin": "https://developer.riotgames.com"
-}
+
 export default class RiotServiceClient {
     private _axios_api: AxiosInstance;
     private _axios_cdn: AxiosInstance;
@@ -225,7 +220,6 @@ export default class RiotServiceClient {
         })
     }
 
-
     async getCurrentPatch(): Promise<string> {
         let patchCall: AxiosResponse<string[]> = await axios.get<string[]>("https://ddragon.leagueoflegends.com/api/versions.json")
         return patchCall.data[0]
@@ -239,7 +233,6 @@ export default class RiotServiceClient {
         return response.data
     }
 
-    
     async getPUUID(summonerId: string): Promise<string> {
         // leaving as AxiosResponse object lets you access the property names
         const response: AxiosResponse = await this._axios_api.get(`summoner/v4/summoners/${summonerId}`)

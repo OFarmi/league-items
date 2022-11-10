@@ -45,6 +45,7 @@ export default class DataGathering {
             tier: "CHALLENGER",
             division: "I"
         }
+        //-> next lowest rank if none left
 
         const summonerIds: LeagueEntry[] = await this._apiClient.getSummonerIds(defaultRank)
         summonerIds.forEach(summoner => {
@@ -53,6 +54,10 @@ export default class DataGathering {
                 this._summonerIdQueue.push(summoner.summonerId)
             }
         })
+
+        if (this._summonerIdQueue.length == 0) {
+
+        }
     }
 
     async getMatches() {
@@ -97,15 +102,15 @@ export default class DataGathering {
             console.log(`are currently on ${this._matches.length}`)
             const matchToCheck = this._matches.shift()
             await this.analyzeMatch(matchToCheck!)
-            //this._checkedMatches.push(matchToCheck!)
         }
 
         if (this._checkedMatches.length < 200) {
             await this.getMatches()
             await this.analyzeMatches()
-            return
+            //return
+        } else {
+            console.log("checked enough matches")
         }
-        console.log("checked enough matches")
     }
 
     // adds match wins/losses for each participant's champion and their items into db
@@ -114,9 +119,15 @@ export default class DataGathering {
 
         const { info } = matchResponse
         const patch = info.gameVersion.split(".", 2).join(".")
-        // TODO: add functionality that updates patch if gameVersion > currentPatch
+        // if currentpatch > patch in db, delete all in matches table
         if (patch !== this._currentPatch || info.queueId != 420) {
-            return
+            if (patch > this._currentPatch) {
+                this._currentPatch = patch
+                this._checkedMatches = []
+            } else {
+                return
+            }
+            
         }
 
         matchResponse.metadata.participants.forEach(participantId => {
@@ -131,56 +142,40 @@ export default class DataGathering {
         const losers: MatchParticipant[] = participants.slice(5)
 
         for (const winner of winners) {
-            if (!this._puuidQueue.includes(winner.puuid)) {
-                console.log("should never be hit")
-                this._puuidQueue.push(winner.puuid)
-            }
-
-            const itemNumbers = [winner.item0, winner.item1, winner.item2, winner.item3, winner.item4, winner.item5, winner.item6].filter(item => item)
-            const items: Item[] = await Promise.all(itemNumbers.map(itemNumber => this._apiClient.getItemData(this._currentPatch, itemNumber)))
-            for (const item of items) {
-                const isMythic: boolean = item.description.toLowerCase().includes("mythic")
-                const isLegendary: boolean = (!isMythic) && (!item.tags.includes("Consumable")) && (!item.into && !!item.from)
-                if (isMythic) {
-                    if (item.requiredAlly) {
-                        const mythic = await this._apiClient.getItemData(this._currentPatch, parseInt(item.from[0]))
-                        await addWin(winner.championName, mythic.id, mythic.name, winner.teamPosition.toLowerCase(), isMythic, isLegendary)
-                    } else {
-                        await addWin(winner.championName, item.id, item.name, winner.teamPosition.toLowerCase(), isMythic, isLegendary)
-                    }
-                }
-                else if (isLegendary) {
-                    await addWin(winner.championName, item.id, item.name, winner.teamPosition.toLowerCase(), isMythic, isLegendary)
-                }
-            }
+            await this.updateWinrate(winner, addWin)
         }
-
+        
         for (const loser of losers) {
-            if (!this._puuidQueue.includes(loser.puuid)) {
-                this._puuidQueue.push(loser.puuid)
-            }
-
-            const itemNumbers = [loser.item0, loser.item1, loser.item2, loser.item3, loser.item4, loser.item5, loser.item6].filter(item => item)
-            const items: Item[] = await Promise.all(itemNumbers.map(itemNumber => this._apiClient.getItemData(this._currentPatch, itemNumber)))
-            for (const item of items) {
-                const isMythic: boolean = item.description.toLowerCase().includes("mythic")
-                const isLegendary: boolean = !isMythic && !item.tags.includes("Consumable") && (!item.into && !!item.from)
-                if (isMythic) {
-                    if (item.requiredAlly) {
-                        const mythic = await this._apiClient.getItemData(this._currentPatch, parseInt(item.from[0]))
-                        await addLoss(loser.championName, mythic.id, mythic.name, loser.teamPosition.toLowerCase(), isMythic, isLegendary)
-                    } else {
-                        await addLoss(loser.championName, item.id, item.name, loser.teamPosition.toLowerCase(), isMythic, isLegendary)
-                    }
-                }
-                else if (isLegendary) {
-                    await addLoss(loser.championName, item.id, item.name, loser.teamPosition.toLowerCase(), isMythic, isLegendary)
-                }
-            }
+            await this.updateWinrate(loser, addLoss)
         }
         this._checkedMatches.push(matchId)
         addMatch(matchId, patch)
 
+    }
+
+    // helper function
+    async updateWinrate(player: MatchParticipant, fn: (...args: any[]) => Promise<void>) {
+        if (!this._puuidQueue.includes(player.puuid)) {
+            this._puuidQueue.push(player.puuid)
+        }
+
+        const itemNumbers = [player.item0, player.item1, player.item2, player.item3, player.item4, player.item5, player.item6].filter(item => item)
+        const items: Item[] = await Promise.all(itemNumbers.map(itemNumber => this._apiClient.getItemData(this._currentPatch, itemNumber)))
+        for (const item of items) {
+            const isMythic: boolean = item.description.toLowerCase().includes("mythic")
+            const isLegendary: boolean = !isMythic && !item.tags.includes("Consumable") && (!item.into && !!item.from)
+            if (isMythic) {
+                if (item.requiredAlly) {
+                    const mythic = await this._apiClient.getItemData(this._currentPatch, parseInt(item.from[0]))
+                    await fn(player.championName, mythic.id, mythic.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
+                } else {
+                    await fn(player.championName, item.id, item.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
+                }
+            }
+            else if (isLegendary) {
+                await fn(player.championName, item.id, item.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
+            }
+        }
     }
 
     get getCheckedMatches(): string[] {

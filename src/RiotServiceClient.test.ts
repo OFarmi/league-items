@@ -73,7 +73,7 @@ describe('RiotServiceClient', () => {
         //await addWin("ahri", 1, "a", "middle")
         
 
-        //await addLoss('ahri', 1, "a", "middle", true, false)
+        //await addLoss('ahri', 1//, "a", "middle", true, false)
         const total = await totalMatches()
         console.log(total)
         const realtotal = await getMatches("12.21")
