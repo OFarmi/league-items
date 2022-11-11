@@ -1,3 +1,37 @@
+.search-bar-container {
+    min-height: 350px;
+}
+
 .search-bar{
-    position: fixed
+    top:50%;
+    left:50%;
+    align-items: center;
+    justify-content: center;
+    line-height: 40px;
+    color:plum;
+    background-color: transparent;
+    
+}
+
+.suggestions-container {
+    font-size: 13px;
+    max-height: 100px;
+    display:flex;
+    flex-direction: column;
+}
+
+.suggestions {
+    color:plum;
+    width: 200px;
+}
+
+.suggestions p:hover{
+    background-color: #282c50;
+    color:white;
+}
+
+.suggestion {
+    border-radius: 5px;
+    height: 20px;
+    margin:0
 }

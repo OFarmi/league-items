@@ -22,8 +22,8 @@ getData().then(async (data) => {
 }).then((data: DataGathering) => {
     server.listen(8081, () => {
         const address = server.address() as AddressInfo
-    
+
         console.log(`Listening on ${address.port}`)
-        
+
     })
 })
