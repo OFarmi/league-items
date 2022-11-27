@@ -1,5 +1,7 @@
-import RiotServiceClient, { LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest, Item } from "./RiotServiceClient"
+import RiotServiceClient, { LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest, Item, ItemResponse } from "./RiotServiceClient"
 import { addLoss, addMatch, addWin, getMatches } from "./db-manager/dbm";
+
+const MAX_MATCHES = 400
 
 export default class DataGathering {
     // could make matches/summids/puuids objects that have a "checked" property
@@ -20,18 +22,27 @@ export default class DataGathering {
 
     private _currentPatch: string
     
-    constructor(apiClient: RiotServiceClient, currentPatch: string, matches: string[]) {
+    private static _instance: DataGathering;
+
+    private constructor(apiClient: RiotServiceClient, currentPatch: string, matches: string[]) {
         this._apiClient = apiClient
         this._currentPatch = currentPatch
         this._checkedMatches = matches
     }
 
-    static async create() {
+    private static async create() {
         const apiClient: RiotServiceClient = new RiotServiceClient()
         const currentPatch: string = (await apiClient.getCurrentPatch()).split(".", 2).join(".")
-        const checkedMatches = await getMatches(currentPatch) // 
+        const checkedMatches: string[] = await getMatches(currentPatch) // 
         // turns patch into only the first 2 numbers because match API returns extra numbers
-        return new DataGathering(apiClient, currentPatch, checkedMatches)
+        this._instance = new DataGathering(apiClient, currentPatch, checkedMatches)
+    }
+
+    static async getInstance(): Promise<DataGathering> {
+        if (!this._instance) {
+            await this.create()
+        }
+        return this._instance
     }
 
     // essentially must be the first function run for each new patch
@@ -98,16 +109,15 @@ export default class DataGathering {
     }
 
     async analyzeMatches() {
-        while (this._matches.length > 0 && (this._checkedMatches.length < 200)) {
+        while (this._matches.length > 0 && (this._checkedMatches.length < MAX_MATCHES)) {
             console.log(`are currently on ${this._matches.length}`)
             const matchToCheck = this._matches.shift()
             await this.analyzeMatch(matchToCheck!)
         }
 
-        if (this._checkedMatches.length < 200) {
+        if (this._checkedMatches.length < MAX_MATCHES) {
             await this.getMatches()
             await this.analyzeMatches()
-            //return
         } else {
             console.log("checked enough matches")
         }
@@ -120,10 +130,10 @@ export default class DataGathering {
         const { info } = matchResponse
         const patch = info.gameVersion.split(".", 2).join(".")
         // if currentpatch > patch in db, delete all in matches table
+        // the patch comparison to currentPatch should be changed. 13.1.1 will be seen as less than 12.1.21, but 13 patch is more recent
         if (patch !== this._currentPatch || info.queueId != 420) {
             if (patch > this._currentPatch) {
-                this._currentPatch = patch
-                this._checkedMatches = []
+                this.updateVersion(patch)
             } else {
                 return
             }
@@ -142,15 +152,20 @@ export default class DataGathering {
         const losers: MatchParticipant[] = participants.slice(5)
 
         for (const winner of winners) {
-            await this.updateWinrate(winner, addWin)
+            // dont await these, analyzeMatch gets awaited so there won't be a same champ/item combo between winners and losers
+            this.updateWinrate(winner, addWin)
         }
         
         for (const loser of losers) {
-            await this.updateWinrate(loser, addLoss)
+            this.updateWinrate(loser, addLoss)
         }
         this._checkedMatches.push(matchId)
         addMatch(matchId, patch)
+    }
 
+    updateVersion(version: string) {
+        this._currentPatch = version
+        this._checkedMatches = []
     }
 
     // helper function
@@ -178,6 +193,10 @@ export default class DataGathering {
         }
     }
 
+    async getItemData(): Promise<Item> {
+        return await this._apiClient.getItemData(this._currentPatch, 7018)
+    }
+
     get getCheckedMatches(): string[] {
         return [...this._checkedMatches]
     }
@@ -189,4 +208,5 @@ export default class DataGathering {
     get getCheckedPuuids(): string[] {
         return [...this._checkedPuuids]
     }
+
 }

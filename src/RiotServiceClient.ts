@@ -31,7 +31,8 @@ export type Item = {
     into: string[],
     requiredAlly: string,
     from: string[],
-    tags: string[]
+    tags: string[],
+    plaintext: string
 }
 
 export type MatchParticipant = {
@@ -204,11 +205,13 @@ export default class RiotServiceClient {
             }
         })
 
+        // can have a catch in each function call that uses the error.response.data.retry_after
         axiosRetry(this._axios_api_matches, {
             retries: 3,
-            retryDelay: (retryCount) => {
-                console.log(`retry attempt: ${retryCount}`)
+            retryDelay: (retryCount, error) => {
+                console.log(`retry attempt: ${retryCount} with ${error.response?.headers?["Retry-After"] || undefined: undefined}`)
                 return retryCount * 1000;
+                //return error.response?.config?.headers?['Retry-After'] as number || retryCount * 1000
             },
             retryCondition: (error) => {
                 return [429, 500, 503].includes(error.response?.status as number)
@@ -227,8 +230,6 @@ export default class RiotServiceClient {
 
     async getSummonerIds(requestData: SummonerIdRequest): Promise<LeagueEntry[]> {
         const response: AxiosResponse<LeagueEntry[]> = await this._axios_api.get<LeagueEntry[]>(`/league-exp/v4/entries/${requestData.queue}/${requestData.tier}/${requestData.division}?page=1`)
-        //console.log(response.data)
-        //response.data[0]
         // CAN CHANGE TO return response.data.map(e => e.summonerId) if want to lower LeagueEntry clutter
         return response.data
     }
@@ -269,12 +270,14 @@ export default class RiotServiceClient {
     async getItemData(patch: string, item: number): Promise<Item> {
         const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
         const reply = Object.entries(response.data.data).find(([k,v]) => parseInt(k) === item)
-        //console.log(item + " " + reply![1].name)
         reply![1].id = item
 
         return reply![1]
     }
 
-    //unsure if necessary in backend
-    //async getChampionImage(champion: string)
+    async getItemsData(patch: string): Promise<Item[]> {
+        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
+        console.log(response.data.data)
+        return response.data.data
+    }
 }

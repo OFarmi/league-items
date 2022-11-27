@@ -1,13 +1,34 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./Winrates.css"
+import Item from "../Item/Item";
 
-export default function Winrates(props: { champion: string }) {
-    const [items, setItems] = useState<any[]>([]);
+export type ItemData = {
+    item_id: string,
+    item_name: string,
+    winrate: number
+}
 
+
+export default function Winrates(props: { champion: string, version: string }) {
+    const [items, setItems] = useState<ItemData[]>([]);
+    const [itemData, setItemData] = useState<any>()
+
+    //gets the description and gold cost of all items from riot API
+    useEffect(() => {
+        if (props.version) {
+            axios.get(`https://ddragon.leagueoflegends.com/cdn/${props.version}/data/en_US/item.json`, {
+            })
+                .then((res) => {
+                    setItemData(res.data)
+                })
+        }
+    }, [props.version])
+
+    //returns the item statistics stored in DB
     useEffect(() => {
         if (props.champion) {
-            axios.get(`http://localhost:8081/${props.champion}`)
+            axios.get(`http://localhost:8081/${props.champion}`,)
                 .then((res) => {
                     setItems(res.data)
                 })
@@ -16,22 +37,25 @@ export default function Winrates(props: { champion: string }) {
 
     return (
         <div className="winrate-container">
-            <img className="champ-image" src={props.champion ? `http://ddragon.leagueoflegends.com/cdn/12.21.1/img/champion/${props.champion}.png` : ''} />
+            {
+                props.champion &&
+                <img
+                    className="champ-image"
+                    src={`http://ddragon.leagueoflegends.com/cdn/${props.version}/img/champion/${props.champion}.png`} />
+            }
             {
                 <div className="items-container">
                     {items.length ? items.map((item) => (
-                        <div className="item-container" key={item.item_id}>
-                            <div className="item-image">
-                                <img key={item.item_name} src={`http://ddragon.leagueoflegends.com/cdn/12.21.1/img/item/${item.item_id}.png`} />
-                            </div>
-                            <div className="item-winrate">
-                                <h3 key={item.item_id}>
-                                    {item.winrate}%{"\n"}
-                                </h3>
-                            </div>
-                        </div>
-                    )) : props.champion ? "No recorded games" : "Select Champion"}
-                </div>}
+                        <React.Fragment key={item.item_id}>
+                            <Item
+                                itemData={item}
+                                description={itemData.data[item.item_id].description}
+                                gold={itemData.data[item.item_id].gold.total}
+                                version={props.version} />
+                        </React.Fragment>
+                    )) : props.champion ? "No recorded games" : "Select a Champion"}
+                </div>
+            }
         </div>
     )
 

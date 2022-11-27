@@ -10,7 +10,7 @@ app.use(CORS())
 const server = http.createServer(app)
 
 const getData = async () => {
-    return await DataGathering.create()
+    return await DataGathering.getInstance()
 }
 
 addWinrateRoutes(server, app)

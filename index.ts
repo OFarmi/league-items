@@ -11,19 +11,24 @@ app.use(CORS())
 const server = http.createServer(app)
 
 const getData = async () => {
-    return await DataGathering.create()
+    await (await DataGathering.getInstance()).analyzeMatches()
 }
 
 addWinrateRoutes(server, app)
 
+getData()
+
+server.listen(8081, () => {
+    const address = server.address() as AddressInfo
+
+    console.log(`Listening on ${address.port}`)
+})
+
+/*
 getData().then(async (data) => {
     await data.analyzeMatches()
     return data
 }).then((data: DataGathering) => {
-    server.listen(8081, () => {
-        const address = server.address() as AddressInfo
-
-        console.log(`Listening on ${address.port}`)
-
-    })
+    
 })
+*/
