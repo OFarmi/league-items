@@ -67,7 +67,7 @@ export default function ChampionsSearchbar(props: { search: (champion: string) =
             axios.get(`https://ddragon.leagueoflegends.com/cdn/${props.version}/data/en_US/champion.json`)
                 .then((res) => {
                     setChampions(Object.getOwnPropertyNames(res.data.data))
-            })
+                })
         }
     }, [props.version])
 
@@ -88,6 +88,7 @@ export default function ChampionsSearchbar(props: { search: (champion: string) =
                     onFocus={() => findSuggestions(prefix)}
                 />
                 <img
+                    alt="search icon"
                     onClick={confirmSearch}
                     className="search-icon"
                     src="/search-icon-png-21.png"
@@ -108,6 +109,7 @@ export default function ChampionsSearchbar(props: { search: (champion: string) =
                                 setCurrentSuggestion("")
                             }}>
                             <img
+                                alt="champion search result"
                                 className="suggestion-img"
                                 src={`http://ddragon.leagueoflegends.com/cdn/${props.version}/img/champion/${suggestion}.png`}>
                             </img>

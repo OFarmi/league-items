@@ -51,15 +51,26 @@ const parseDescription = (description: string) => {
 export default function Item(props: { itemData: ItemData, description: string, gold: string, version: string }) {
 
     return (
-        <div className="item-container" key={props.itemData.item_id}>
+        <div
+            className="item-container"
+            key={props.itemData.item_id}>
             <div className="item-image">
-                <img className="image" key={props.itemData.item_name} src={`http://ddragon.leagueoflegends.com/cdn/${props.version}/img/item/${props.itemData.item_id}.png`} />
+                <img
+                    alt="item"
+                    className="image"
+                    key={props.itemData.item_name}
+                    src={`http://ddragon.leagueoflegends.com/cdn/${props.version}/img/item/${props.itemData.item_id}.png`} />
             </div>
             <div className="description">
-                <h4>{props.itemData.item_name}</h4>
+                <h4>
+                    {props.itemData.item_name}
+                </h4>
                 {parseDescription(props.description)}
             </div>
-            <div className="gold" key={props.itemData.item_id}>{props.gold}g</div>
+            <div
+                className="gold"
+                key={props.itemData.item_id}>{props.gold}g
+            </div>
             <div className="item-winrate">
                 <h3 key={props.itemData.item_id}>
                     {props.itemData.winrate}%{"\n"}

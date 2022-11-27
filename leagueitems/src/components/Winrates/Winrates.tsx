@@ -40,6 +40,7 @@ export default function Winrates(props: { champion: string, version: string }) {
             {
                 props.champion &&
                 <img
+                    alt="champion"
                     className="champ-image"
                     src={`http://ddragon.leagueoflegends.com/cdn/${props.version}/img/champion/${props.champion}.png`} />
             }
