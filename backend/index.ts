@@ -16,6 +16,7 @@ const getData = async () => {
 
 addWinrateRoutes(server, app)
 
+//calling async function without await means server immediately starts accepting calls before the backend fully gathers all data
 getData()
 
 server.listen(8081, () => {
