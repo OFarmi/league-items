@@ -1,0 +1,14 @@
+.winrate-container {
+    display:flex;
+    align-items:center;
+}
+
+.items-container {
+    width:250px;
+    max-width:500vh;
+    height: 400px;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+

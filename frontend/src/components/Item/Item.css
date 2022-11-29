@@ -1,0 +1,57 @@
+
+.item-container {
+    display: flex;
+    flex-direction: row;
+    margin-left:auto;
+    margin-right:auto;
+    align-items:baseline;
+    width:23vh;
+    height:6vh;
+}
+
+.gold {
+    width:auto;
+    height:auto;
+    font-size:2vh;
+    margin-left:auto;
+    margin-right:auto;
+}
+.item-image {
+    width:auto;
+    height:auto;
+    flex-basis: 40%;
+    margin-left: .625rem;
+    margin-right: .5rem;
+    margin-top: auto;
+}
+
+.image {
+    position:relative;
+    margin-left: 1vh;
+    margin-right: 1vh;
+    width:auto;
+    height:auto;
+}
+
+.item-image:hover + .description {
+    display:block;
+    margin-left:10vh;
+}
+
+.item-winrate {
+    width:auto;
+    height:auto;
+    font-size: 1.5vh;
+    margin-left: 5px;
+}
+
+.description {
+    text-align: left;
+    display:none;
+    position:absolute;
+    white-space:pre-line;
+    width: 20rem;
+    font-size:1.5vh;
+    z-index: 1;
+    background-color: #282c45;
+}
