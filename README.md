@@ -2,7 +2,7 @@
 
 ![]()
 
-<img src="https://github.com/OFarmi/league-items/blob/master/img/showcase.gif?raw=true" width="55%" height="55%" />
+<img src="https://github.com/OFarmi/league-items/blob/master/img/showcase.gif?raw=true" width="75%" height="75%" />
 
 ## Features
 
