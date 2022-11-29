@@ -1,6 +1,8 @@
 # League Items
 
-![](https://github.com/OFarmi/league-items/tree/master/img/showcase.gif)
+![]()
+
+<img src="https://github.com/OFarmi/league-items/blob/master/img/showcase.gif?raw=true" width="55%" height="55%" />
 
 ## Features
 
