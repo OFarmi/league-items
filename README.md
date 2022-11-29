@@ -7,7 +7,7 @@
 ## Features
 
 - Searching for a champion displays up to its top 5 winrate items
-  - Winrates are based on 300 matches from matches of Challenger players
+  - Winrates are based on 300 matches from Challenger players
 
 - Hovering over the items shows their stats, passives, and actives.
 
