@@ -4,14 +4,8 @@ import { addChamp, addLoss, addWin, addItem, getWinrates, totalMatches, getMatch
 import { itemDataHandler } from "./LeagueItemRequestHandler";
 import RiotServiceClient, { LeagueEntry, Item } from "./RiotServiceClient"
 
-//const MockAdapter = require('axios-mock-adapter')
-
-//import * from jest;
-
-//jest.mock('axios')
 describe('RiotServiceClient', () => {
     let apiClient: RiotServiceClient;
-    //const mock = new MockAdapter(axios)
     
     beforeAll(async () => {
         apiClient = new RiotServiceClient();
@@ -26,15 +20,8 @@ describe('RiotServiceClient', () => {
             status: 200,
             data: {}
         }
-        //mock.onGet()
-        //const axiosSpy = jest.spyOn(axios, 'get').mockImplementationOnce(() => Promise.resolve(response.data))
-        //axios.get.mockImplementationOnce(() => Promise.resolve("test"))
         const resolved = await apiClient.getSummonerIds(summonerType)
-        //console.log(resolved[0])
-        //console.log(resolved[0].summonerId  as Pick<LeagueEntry, >)
         expect(resolved[0]).toHaveProperty('leagueId')
-        //expect(axiosSpy).toHaveBeenCalledWith(`https://na1.api.riotgames.com/lol/league-exp/v4/entries/RANKED_SOLO_5x5/DIAMOND/IV?page=1&api_key=${process.env.RIOT_API_KEY}`)
-        //console.log(request)
     });
     it('successfully gets a PUUID given a valid summoner id', async () => {
         const summonerType = {

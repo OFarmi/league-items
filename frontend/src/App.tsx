@@ -12,7 +12,7 @@ export default function App() {
   useEffect(() => {
     const updateVersion = async () => {
       axios.get('https://ddragon.leagueoflegends.com/api/versions.json')
-        .then((versions) => {
+        .then((versions: any) => {
           const latestVersion = versions.data[0]
           if (!currentVersion) {
             setCurrentVersion(latestVersion)
