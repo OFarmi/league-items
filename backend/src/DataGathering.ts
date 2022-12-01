@@ -181,7 +181,7 @@ export default class DataGathering {
             const isLegendary: boolean = !isMythic && !item.tags.includes("Consumable") && (!item.into && !!item.from)
             if (isMythic) {
                 if (item.requiredAlly) {
-                    const mythic = await this._apiClient.getItemData(this._currentPatch, parseInt(item.from[0]))
+                    const mythic = await this._apiClient.getItemData(this._currentPatch, parseInt(item.from![0]))
                     await fn(player.championName, mythic.id, mythic.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
                 } else {
                     await fn(player.championName, item.id, item.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
@@ -194,6 +194,7 @@ export default class DataGathering {
     }
 
     async getItemData(): Promise<Item> {
+        console.log(this._currentPatch)
         return await this._apiClient.getItemData(this._currentPatch, 7018)
     }
 

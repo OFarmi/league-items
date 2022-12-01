@@ -21,7 +21,13 @@ export type MatchInfo = {
 }
 
 export type ItemResponse = {
-    data: Item[]
+    //the response has a data field that points to an index signature
+    //each id represents an Item object
+    data: ItemSignatures
+}
+
+export type ItemSignatures = {
+    [id: number]: Item
 }
 
 export type Item = {
@@ -29,8 +35,8 @@ export type Item = {
     name: string,
     description: string,
     into: string[],
-    requiredAlly: string,
-    from: string[],
+    requiredAlly?: string,
+    from?: string[],
     tags: string[],
     plaintext: string
 }
@@ -174,13 +180,13 @@ export type LeagueEntry = {
 
 
 export default class RiotServiceClient {
-    private _axios_api: AxiosInstance;
+    private _axios_api_summoners: AxiosInstance;
     private _axios_cdn: AxiosInstance;
     private _axios_api_matches: AxiosInstance
 
     constructor() {
         // can put X-Riot-Token: API_KEY in header instead of appending it to each link
-        this._axios_api = axios.create({
+        this._axios_api_summoners = axios.create({
             baseURL: "https://na1.api.riotgames.com/lol",
             headers: {
                 "X-Riot-Token": process.env.RIOT_API_KEY!
@@ -194,24 +200,22 @@ export default class RiotServiceClient {
             }
         })
 
-        axiosRetry(this._axios_api, {
+        axiosRetry(this._axios_api_summoners, {
             retries: 3,
-            retryDelay: (retryCount) => {
+            retryDelay: (retryCount, error) => {
                 console.log(`retry attempt: ${retryCount}`)
-                return retryCount * 1000;
+                return error.response?.headers['retry-after'] ? +error.response?.headers['retry-after'] : retryCount * 1000;
             },
             retryCondition: (error) => {
                 return [429, 500, 503].includes(error.response?.status as number)
             }
         })
 
-        // can have a catch in each function call that uses the error.response.data.retry_after
         axiosRetry(this._axios_api_matches, {
             retries: 3,
             retryDelay: (retryCount, error) => {
-                console.log(`retry attempt: ${retryCount} with ${error.response?.headers?["Retry-After"] || undefined: undefined}`)
-                return retryCount * 1000;
-                //return error.response?.config?.headers?['Retry-After'] as number || retryCount * 1000
+                console.log(`retry attempt: ${retryCount}`)
+                return error.response?.headers['retry-after'] ? +error.response?.headers['retry-after'] : retryCount * 1000;
             },
             retryCondition: (error) => {
                 return [429, 500, 503].includes(error.response?.status as number)
@@ -229,14 +233,14 @@ export default class RiotServiceClient {
     }
 
     async getSummonerIds(requestData: SummonerIdRequest): Promise<LeagueEntry[]> {
-        const response: AxiosResponse<LeagueEntry[]> = await this._axios_api.get<LeagueEntry[]>(`/league-exp/v4/entries/${requestData.queue}/${requestData.tier}/${requestData.division}?page=1`)
+        const response: AxiosResponse<LeagueEntry[]> = await this._axios_api_summoners.get<LeagueEntry[]>(`/league-exp/v4/entries/${requestData.queue}/${requestData.tier}/${requestData.division}?page=1`)
         // CAN CHANGE TO return response.data.map(e => e.summonerId) if want to lower LeagueEntry clutter
         return response.data
     }
 
     async getPUUID(summonerId: string): Promise<string> {
         // leaving as AxiosResponse object lets you access the property names
-        const response: AxiosResponse = await this._axios_api.get(`summoner/v4/summoners/${summonerId}`)
+        const response: AxiosResponse = await this._axios_api_summoners.get(`summoner/v4/summoners/${summonerId}`)
         return response.data.puuid
     }
     
@@ -269,15 +273,14 @@ export default class RiotServiceClient {
 
     async getItemData(patch: string, item: number): Promise<Item> {
         const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
-        const reply = Object.entries(response.data.data).find(([k,v]) => parseInt(k) === item)
-        reply![1].id = item
+        const rep = response.data.data[item]
+        rep.id = item //adds the id prop to the returned object
 
-        return reply![1]
+        return rep
     }
 
-    async getItemsData(patch: string): Promise<Item[]> {
+    async getItemsData(patch: string): Promise<ItemSignatures> {
         const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
-        console.log(response.data.data)
         return response.data.data
     }
 }
