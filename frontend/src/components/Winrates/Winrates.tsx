@@ -3,6 +3,8 @@ import axios from "axios";
 import "./Winrates.css"
 import Item from "../Item/Item";
 
+//centralized place for types between frontend and backend?
+
 export type ItemData = {
     item_id: string,
     item_name: string,
@@ -16,21 +18,19 @@ export default function Winrates(props: { champion: string, version: string }) {
 
     //gets the description and gold cost of all items from riot API
     useEffect(() => {
-        if (props.version) {
-            axios.get(`https://ddragon.leagueoflegends.com/cdn/${props.version}/data/en_US/item.json`, {
+        // gets called if there's a new version, but there's no guarantee that there's a new item on this patch
+        axios.get(`http://localhost:8081/items`)
+            .then((data) => {
+                setItemData(data.data)
             })
-                .then((res) => {
-                    setItemData(res.data)
-                })
-        }
     }, [props.version])
 
     //returns the item statistics stored in DB
     useEffect(() => {
         if (props.champion) {
-            axios.get(`http://localhost:8081/${props.champion}`,)
-                .then((res) => {
-                    setItems(res.data)
+            axios.get(`http://localhost:8081/champions/${props.champion}`)
+                .then((itemStats) => {
+                    setItems(itemStats.data)
                 })
         }
     }, [props]);
@@ -50,8 +50,8 @@ export default function Winrates(props: { champion: string, version: string }) {
                         <React.Fragment key={item.item_id}>
                             <Item
                                 itemData={item}
-                                description={itemData.data[item.item_id].description}
-                                gold={itemData.data[item.item_id].gold.total}
+                                description={itemData[item.item_id].description}
+                                gold={itemData[item.item_id].gold.total}
                                 version={props.version} />
                         </React.Fragment>
                     )) : props.champion ? "No recorded games" : "Select a Champion"}

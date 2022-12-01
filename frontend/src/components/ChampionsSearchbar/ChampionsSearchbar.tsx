@@ -6,7 +6,7 @@ export default function ChampionsSearchbar(props: { search: (champion: string) =
     const [prefix, setPrefix] = useState("")
     const [currentSuggestion, setCurrentSuggestion] = useState("")
     const [suggestions, setSuggestions] = useState<string[]>([])
-    const [champions, setChampions] = React.useState<string[]>([])
+    const [champions, setChampions] = useState<string[]>([])
     const lowercaseChampions = champions.map(champion => champion.toLowerCase())
 
 
@@ -63,12 +63,11 @@ export default function ChampionsSearchbar(props: { search: (champion: string) =
     }
 
     useEffect(() => {
-        if (props.version) {
-            axios.get(`https://ddragon.leagueoflegends.com/cdn/${props.version}/data/en_US/champion.json`)
-                .then((res) => {
-                    setChampions(Object.getOwnPropertyNames(res.data.data))
-                })
-        }
+        //gets called if there's a new props.version, but there's no guarantee that version has a new champion
+        axios.get(`http://localhost:8081/champions`)
+            .then((res) => {
+                setChampions(res.data)
+            })
     }, [props.version])
 
     return (

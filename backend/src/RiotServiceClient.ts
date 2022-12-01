@@ -273,10 +273,10 @@ export default class RiotServiceClient {
 
     async getItemData(patch: string, item: number): Promise<Item> {
         const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
-        const rep = response.data.data[item]
-        rep.id = item //adds the id prop to the returned object
+        const reply = response.data.data[item]
+        reply.id = item //adds the id prop to the returned object
 
-        return rep
+        return reply
     }
 
     async getItemsData(patch: string): Promise<ItemSignatures> {

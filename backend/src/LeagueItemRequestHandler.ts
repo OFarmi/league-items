@@ -1,5 +1,5 @@
 import { getWinrates } from "./db-manager/dbm";
-import { Item } from "./RiotServiceClient";
+import { ItemSignatures } from "./RiotServiceClient";
 import DataGathering from "./DataGathering";
 
 export type ChampionWinrateResponse = {
@@ -20,13 +20,18 @@ export async function championWinrateHandler(championName: string): Promise<Cham
     })).sort((a,b) => a.winrate - b.winrate).reverse()
 }
 
-export async function itemDataHandler(): Promise<Item> {
+export async function itemDataHandler(): Promise<ItemSignatures> {
     const dataClient: DataGathering = await DataGathering.getInstance()
     return await dataClient.getItemData()
 }
 
+export async function championListHandler(): Promise<string[]> {
+    const dataClient: DataGathering = await DataGathering.getInstance()
+    return await dataClient.getChampionNames()
+}
+
 export async function updateVersionHandler(version: string) {
     const dataClient: DataGathering = await DataGathering.getInstance()
-    dataClient.updateVersion(version)
+    await dataClient.updateVersion(version)
     await dataClient.analyzeMatches()
 }

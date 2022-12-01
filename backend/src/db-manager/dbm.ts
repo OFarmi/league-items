@@ -193,3 +193,7 @@ export async function getMatches(patch: string): Promise<string[]> {
     })
     return matches.map(match => match.id)
 }
+
+export async function resetWinrates() {
+    await prisma.winrates.deleteMany({})
+}

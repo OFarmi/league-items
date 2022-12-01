@@ -1,5 +1,5 @@
-import RiotServiceClient, { LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest, Item, ItemResponse } from "./RiotServiceClient"
-import { addLoss, addMatch, addWin, getMatches } from "./db-manager/dbm";
+import RiotServiceClient, { LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest, Item, ItemResponse, ItemSignatures } from "./RiotServiceClient"
+import { addLoss, addMatch, addWin, getMatches, resetWinrates } from "./db-manager/dbm";
 
 const MAX_MATCHES = 400
 
@@ -163,9 +163,15 @@ export default class DataGathering {
         addMatch(matchId, patch)
     }
 
-    updateVersion(version: string) {
+    /**
+     * Updates the client to a more recent version. 
+     * The matches checked thus far and winrates aggregated will be cleared because they were on a past version.
+     * @param version new version
+     */
+    async updateVersion(version: string) {
         this._currentPatch = version
         this._checkedMatches = []
+        await resetWinrates()
     }
 
     // helper function
@@ -193,9 +199,12 @@ export default class DataGathering {
         }
     }
 
-    async getItemData(): Promise<Item> {
-        console.log(this._currentPatch)
-        return await this._apiClient.getItemData(this._currentPatch, 7018)
+    async getItemData(): Promise<ItemSignatures> {
+        return await this._apiClient.getItemsData(this._currentPatch)
+    }
+
+    async getChampionNames(): Promise<string[]> {
+        return await this._apiClient.getChampionList(this._currentPatch)
     }
 
     get getCheckedMatches(): string[] {

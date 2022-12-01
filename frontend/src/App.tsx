@@ -27,6 +27,7 @@ export default function App() {
         })
     }
 
+    // checks for a new update every 12 hours
     updateVersion()
     const interval = setInterval(updateVersion, 1000 * 60 * 60 * 12)
     return () => {
