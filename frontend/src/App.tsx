@@ -11,19 +11,19 @@ export default function App() {
 
   useEffect(() => {
     const updateVersion = async () => {
-      axios.get('https://ddragon.leagueoflegends.com/api/versions.json')
+      axios.get('/version')
         .then((versions: any) => {
-          const latestVersion = versions.data[0]
+          const latestVersion = versions.data
           if (!currentVersion) {
             setCurrentVersion(latestVersion)
           }
           else if (currentVersion !== latestVersion) {
             setCurrentVersion(latestVersion)
-            axios.patch('http://localhost:8081/version', {
+            axios.patch('/version', {
               version: latestVersion
             })
           }
-          console.log(latestVersion)
+          //console.log(latestVersion)
         })
     }
 

@@ -1,4 +1,4 @@
-import RiotServiceClient, { LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest, Item, ItemResponse, ItemSignatures } from "./RiotServiceClient"
+import RiotServiceClient, { LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest, Item, ItemSignatures } from "./RiotServiceClient"
 import { addLoss, addMatch, addWin, getMatches, resetWinrates } from "./db-manager/dbm";
 
 const MAX_MATCHES = 400
@@ -14,28 +14,27 @@ export default class DataGathering {
     private _summonerIdQueue: string[] = []
 
     private _puuidQueue: string[] = []
-    // used to add the 
 
     private _checkedPuuids: string[] = []
 
     private _apiClient: RiotServiceClient
 
-    private _currentPatch: string
+    private _currentVersion: string
     
     private static _instance: DataGathering;
 
-    private constructor(apiClient: RiotServiceClient, currentPatch: string, matches: string[]) {
+    private constructor(apiClient: RiotServiceClient, currentVersion: string, matches: string[]) {
         this._apiClient = apiClient
-        this._currentPatch = currentPatch
+        this._currentVersion = currentVersion
         this._checkedMatches = matches
     }
 
     private static async create() {
         const apiClient: RiotServiceClient = new RiotServiceClient()
-        const currentPatch: string = (await apiClient.getCurrentPatch()).split(".", 2).join(".")
-        const checkedMatches: string[] = await getMatches(currentPatch) // 
+        const currentVersion: string = (await apiClient.getCurrentVersion()).split(".", 2).join(".")
+        const checkedMatches: string[] = await getMatches(currentVersion) // 
         // turns patch into only the first 2 numbers because match API returns extra numbers
-        this._instance = new DataGathering(apiClient, currentPatch, checkedMatches)
+        this._instance = new DataGathering(apiClient, currentVersion, checkedMatches)
     }
 
     static async getInstance(): Promise<DataGathering> {
@@ -45,9 +44,9 @@ export default class DataGathering {
         return this._instance
     }
 
-    // essentially must be the first function run for each new patch
-    // if not a new patch, we should constantly have a new batch of player PUUIDs to go through that are added from each subsequent match that is analyzed.
-    // 
+    /**
+     * Gets the initial batch of players from Challenger and adds them into the queue if they haven't already been checked
+     */
     async getPlayers() {
         // TODO: add some functionality for choosing new ranks or just loop through ranks
         // would mean labeling wins/losses with rank?
@@ -56,11 +55,10 @@ export default class DataGathering {
             tier: "CHALLENGER",
             division: "I"
         }
-        //-> next lowest rank if none left
+        //-> next rank if none left
 
         const summonerIds: LeagueEntry[] = await this._apiClient.getSummonerIds(defaultRank)
         summonerIds.forEach(summoner => {
-            // should add PUUIDs, not summoner IDs. this is because new PUUIDs can be found from each match, and using PUUID skips one step vs summoner IDS
             if (!this._summonerIdQueue.includes(summoner.summonerId) && !this._checkedSummonerIds.includes(summoner.summonerId)) {
                 this._summonerIdQueue.push(summoner.summonerId)
             }
@@ -71,6 +69,9 @@ export default class DataGathering {
         }
     }
 
+    /**
+     * Gets matches from the PUUID queue if not empty, if empty then from the summonerIdQueue if not empty, if empty then get new summonerIds and try again.
+     */
     async getMatches() {
         let matches: string[] = []
         if (this._puuidQueue.length > 0) {
@@ -108,6 +109,9 @@ export default class DataGathering {
         })
     }
 
+    /**
+     * Analyzes matches until MAX_MATCHES have been checked
+     */
     async analyzeMatches() {
         while (this._matches.length > 0 && (this._checkedMatches.length < MAX_MATCHES)) {
             console.log(`are currently on ${this._matches.length}`)
@@ -124,15 +128,18 @@ export default class DataGathering {
     }
 
     // adds match wins/losses for each participant's champion and their items into db
+    /**
+     * If this match is on the most recent game version, analyze each participant's champion and items and add data to db.
+     * If any of the other 9 participants haven't yet been added to the queue or checked, add them to the puuidQueue.
+     * @param matchId 
+     */
     async analyzeMatch(matchId: string) {
         const matchResponse: MatchDataResponse = await this._apiClient.getMatchData(matchId)
 
         const { info } = matchResponse
         const patch = info.gameVersion.split(".", 2).join(".")
-        // if currentpatch > patch in db, delete all in matches table
-        // the patch comparison to currentPatch should be changed. 13.1.1 will be seen as less than 12.1.21, but 13 patch is more recent
-        if (patch !== this._currentPatch || info.queueId != 420) {
-            if (patch > this._currentPatch) {
+        if (patch !== this._currentVersion || info.queueId != 420) {
+            if (patch > this._currentVersion) {
                 this.updateVersion(patch)
             } else {
                 return
@@ -141,13 +148,14 @@ export default class DataGathering {
         }
 
         matchResponse.metadata.participants.forEach(participantId => {
-            if (!this._puuidQueue.includes(participantId)) {
+            if (!this._puuidQueue.includes(participantId) && !this._checkedPuuids.includes(participantId)) {
                 this._puuidQueue.push(participantId)
             }
         })
 
         const { participants }: {participants: MatchParticipant[]} = info
 
+        // first 5 participants in the list are always the winners
         const winners: MatchParticipant[] = participants.slice(0,5)
         const losers: MatchParticipant[] = participants.slice(5)
 
@@ -169,52 +177,81 @@ export default class DataGathering {
      * @param version new version
      */
     async updateVersion(version: string) {
-        this._currentPatch = version
+        this._currentVersion = version
         this._checkedMatches = []
         await resetWinrates()
     }
 
-    // helper function
-    async updateWinrate(player: MatchParticipant, fn: (...args: any[]) => Promise<void>) {
+    /**
+     * Used to determine if this._currentVersion should be updated
+     * @returns the latest version according to 3rd party RG API
+     */
+    async getLatestVersion(): Promise<string> {
+        return await this._apiClient.getCurrentVersion()
+    }
+
+    /**
+     * Checks a single player's champion and items and adds wins or losses in the db.
+     * @param player to have their champion and items analyzed
+     * @param fn either addWin or addLoss
+     */
+    async updateWinrate(player: MatchParticipant, addWinOrLoss: (...args: any[]) => Promise<void>) {
         if (!this._puuidQueue.includes(player.puuid)) {
             this._puuidQueue.push(player.puuid)
         }
 
         const itemNumbers = [player.item0, player.item1, player.item2, player.item3, player.item4, player.item5, player.item6].filter(item => item)
-        const items: Item[] = await Promise.all(itemNumbers.map(itemNumber => this._apiClient.getItemData(this._currentPatch, itemNumber)))
+        const items: Item[] = await Promise.all(itemNumbers.map(itemNumber => this._apiClient.getItemData(this._currentVersion, itemNumber)))
         for (const item of items) {
             const isMythic: boolean = item.description.toLowerCase().includes("mythic")
             const isLegendary: boolean = !isMythic && !item.tags.includes("Consumable") && (!item.into && !!item.from)
             if (isMythic) {
                 if (item.requiredAlly) {
-                    const mythic = await this._apiClient.getItemData(this._currentPatch, parseInt(item.from![0]))
-                    await fn(player.championName, mythic.id, mythic.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
+                    const mythic = await this._apiClient.getItemData(this._currentVersion, parseInt(item.from![0]))
+                    await addWinOrLoss(player.championName, mythic.id, mythic.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
                 } else {
-                    await fn(player.championName, item.id, item.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
+                    await addWinOrLoss(player.championName, item.id, item.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
                 }
             }
             else if (isLegendary) {
-                await fn(player.championName, item.id, item.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
+                await addWinOrLoss(player.championName, item.id, item.name, player.teamPosition.toLowerCase(), isMythic, isLegendary)
             }
         }
     }
 
+    /**
+     * 
+     * @returns An index signature of each item id pointing to its item's data
+     */
     async getItemData(): Promise<ItemSignatures> {
-        return await this._apiClient.getItemsData(this._currentPatch)
+        return await this._apiClient.getItemsData(this._currentVersion)
     }
 
+    /**
+     * 
+     * @returns A list of champion names
+     */
     async getChampionNames(): Promise<string[]> {
-        return await this._apiClient.getChampionList(this._currentPatch)
+        return await this._apiClient.getChampionList(this._currentVersion)
     }
 
+    /**
+     * A list of all match IDs that have been checked
+     */
     get getCheckedMatches(): string[] {
         return [...this._checkedMatches]
     }
 
+    /**
+     * A list of summoner IDs that have been checked
+     */
     get getCheckedSummonerIds(): string[] {
         return [...this._checkedSummonerIds]
     }
 
+    /**
+     * A list of puuids that have been checked
+     */
     get getCheckedPuuids(): string[] {
         return [...this._checkedPuuids]
     }

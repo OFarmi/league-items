@@ -59,12 +59,11 @@ export default function ChampionsSearchbar(props: { search: (champion: string) =
                 setCurrentSuggestion(suggestions[index - 1])
             }
         }
-
     }
 
     useEffect(() => {
         //gets called if there's a new props.version, but there's no guarantee that version has a new champion
-        axios.get(`http://localhost:8081/champions`)
+        axios.get(`/champions`)
             .then((res) => {
                 setChampions(res.data)
             })

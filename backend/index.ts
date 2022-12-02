@@ -19,17 +19,8 @@ addWinrateRoutes(server, app)
 //calling async function without await means server immediately starts accepting calls before the backend fully gathers all data
 getData()
 
-server.listen(8081, () => {
+server.listen(process.env.PORT || 8081, () => {
     const address = server.address() as AddressInfo
 
     console.log(`Listening on ${address.port}`)
 })
-
-/*
-getData().then(async (data) => {
-    await data.analyzeMatches()
-    return data
-}).then((data: DataGathering) => {
-    
-})
-*/

@@ -10,7 +10,6 @@ export type ChampionWinrateResponse = {
 }
 
 
-
 export async function championWinrateHandler(championName: string): Promise<ChampionWinrateResponse[]> {
     return (await getWinrates(championName)).filter(winrate => winrate.wins! + winrate.losses! > 0).map(winrate => ({
         item_name: winrate.item_name,
@@ -34,4 +33,9 @@ export async function updateVersionHandler(version: string) {
     const dataClient: DataGathering = await DataGathering.getInstance()
     await dataClient.updateVersion(version)
     await dataClient.analyzeMatches()
+}
+
+export async function latestVersionHandler(): Promise<string> {
+    const dataClient: DataGathering = await DataGathering.getInstance()
+    return await dataClient.getLatestVersion()
 }

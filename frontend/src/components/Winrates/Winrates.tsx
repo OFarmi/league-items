@@ -19,8 +19,9 @@ export default function Winrates(props: { champion: string, version: string }) {
     //gets the description and gold cost of all items from riot API
     useEffect(() => {
         // gets called if there's a new version, but there's no guarantee that there's a new item on this patch
-        axios.get(`http://localhost:8081/items`)
+        axios.get(`/items`)
             .then((data) => {
+                //ItemSignatures type
                 setItemData(data.data)
             })
     }, [props.version])
@@ -28,7 +29,7 @@ export default function Winrates(props: { champion: string, version: string }) {
     //returns the item statistics stored in DB
     useEffect(() => {
         if (props.champion) {
-            axios.get(`http://localhost:8081/champions/${props.champion}`)
+            axios.get(`/champions/${props.champion}`)
                 .then((itemStats) => {
                     setItems(itemStats.data)
                 })

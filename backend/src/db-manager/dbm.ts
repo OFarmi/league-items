@@ -87,9 +87,9 @@ export async function addWin(champion: string, itemId: number, itemName: string,
             }
         });
     } catch (e) {
-        // this means we're adding a new item or champion
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (e.code === 'P2003') {
+                // this means we're adding a new item or champion
                 const msg = e.message.split(' ').slice(-2,-1)[0]
                 if (msg.includes("champion")) {
                     await addChamp(champion)
@@ -130,9 +130,9 @@ export async function addLoss(champion: string, itemId: number, itemName: string
             }
         });
     } catch (e) {
-        // this means we're adding a new item or champion
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (e.code === 'P2003') {
+                // this means we're adding a new item or champion
                 const msg = e.message.split(' ').slice(-2,-1)[0]
                 if (msg.includes("champion")) {
                     await addChamp(champion)

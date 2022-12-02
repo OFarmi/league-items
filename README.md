@@ -5,7 +5,7 @@
 ## Features
 
 - Searching for a champion displays up to its top 5 winrate items
-  - Winrates are based on 300 matches from Challenger players
+  - Winrates are based on 400 matches from Challenger players
 
 
 - Hovering over the items shows their stats, passives, and actives.
@@ -19,8 +19,8 @@
 - Create a database using the prisma schema in [schema.prisma](/prisma/schema.prisma)
 
 - Create a .env file in the backend folder with the same format as [.env.example](/backend/.env.example)
-  - Default port should be set to 8080
-  - .env file should be created in the frontend folder with the same port
+  - Default port should be set to 8081
+  - .env file should be created in the frontend folder with port 8080
 
 ## Usage
 

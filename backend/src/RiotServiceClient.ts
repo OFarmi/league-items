@@ -10,6 +10,7 @@ export type MatchDataResponse = {
 }
 
 type Metadata = {
+    // each participant's PUUID
     participants: string[]
 }
 
@@ -22,11 +23,11 @@ export type MatchInfo = {
 
 export type ItemResponse = {
     //the response has a data field that points to an index signature
-    //each id represents an Item object
     data: ItemSignatures
 }
 
 export type ItemSignatures = {
+    //each id represents an Item object
     [id: number]: Item
 }
 
@@ -185,7 +186,6 @@ export default class RiotServiceClient {
     private _axios_api_matches: AxiosInstance
 
     constructor() {
-        // can put X-Riot-Token: API_KEY in header instead of appending it to each link
         this._axios_api_summoners = axios.create({
             baseURL: "https://na1.api.riotgames.com/lol",
             headers: {
@@ -227,9 +227,9 @@ export default class RiotServiceClient {
         })
     }
 
-    async getCurrentPatch(): Promise<string> {
-        let patchCall: AxiosResponse<string[]> = await axios.get<string[]>("https://ddragon.leagueoflegends.com/api/versions.json")
-        return patchCall.data[0]
+    async getCurrentVersion(): Promise<string> {
+        let versions: AxiosResponse<string[]> = await axios.get<string[]>("https://ddragon.leagueoflegends.com/api/versions.json")
+        return versions.data[0]
     }
 
     async getSummonerIds(requestData: SummonerIdRequest): Promise<LeagueEntry[]> {
@@ -239,18 +239,15 @@ export default class RiotServiceClient {
     }
 
     async getPUUID(summonerId: string): Promise<string> {
-        // leaving as AxiosResponse object lets you access the property names
         const response: AxiosResponse = await this._axios_api_summoners.get(`summoner/v4/summoners/${summonerId}`)
         return response.data.puuid
     }
     
-    // put list of matches into a set so there are no copies
     async getPlayerMatches(puuid: string): Promise<string[]> {
         const response: AxiosResponse<string[]> = await this._axios_api_matches.get<string[]>(`match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20`)
         return response.data
     }
     
-    // get each player from the match, and add into a DB(?) whether it was a win or loss for each given item.
     async getMatchData(matchId: string): Promise<MatchDataResponse> {
         const response: AxiosResponse<MatchDataResponse> = await this._axios_api_matches.get<MatchDataResponse>(`match/v5/matches/${matchId}`)
         return response.data

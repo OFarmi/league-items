@@ -49,7 +49,7 @@ const parseDescription = (description: string) => {
 }
 
 export default function Item(props: { itemData: ItemData, description: string, gold: string, version: string }) {
-
+    
     return (
         <div
             className="item-container"

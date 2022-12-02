@@ -1,5 +1,3 @@
-import axios from "axios";
-import axiosRetry from "axios-retry";
 import DataGathering from "./DataGathering";
 import { addChamp, addLoss, addWin, addItem, getWinrates, totalMatches, getMatches } from "./db-manager/dbm";
 import { itemDataHandler } from "./LeagueItemRequestHandler";
@@ -89,7 +87,7 @@ describe('RiotServiceClients cdn client', () => {
 
     beforeAll(async () => {
         apiClient = new RiotServiceClient()
-        patch = (await apiClient.getCurrentPatch()).split(".", 2).join(".")
+        patch = (await apiClient.getCurrentVersion()).split(".", 2).join(".")
     });
 
     it('can get list of champions', async () => {
