@@ -7,12 +7,19 @@ import { ItemSignatures } from './RiotServiceClient'
 
 
 export default function addWinrateRoutes(http: Server, app: Express): io.Server {
+    
+    /**
+     * Gets the top 5 winrate items of the given championName
+     */
     app.get('/champions/:championName', async (req, res) => {
         const result: ChampionWinrateResponse[] = await championWinrateHandler(req.params.championName)
         res.status(StatusCodes.OK)
             .json(result)
     })
 
+    /**
+     * Gets a list of all champion names
+     */
     app.get('/champions', async (_req, res) => {
         const result: string[] = await championListHandler()
         res.status(StatusCodes.OK)
@@ -37,7 +44,6 @@ export default function addWinrateRoutes(http: Server, app: Express): io.Server 
 
     /**
      * Updates the current DataGathering client's version to a more recent version received from 3rd party RG API
-     * express.json appears to be necessary for req.body to be read
      */
     app.patch('/version', express.json(), async (req, res) => {
         const result = await updateVersionHandler(req.body.version)

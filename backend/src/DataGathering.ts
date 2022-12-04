@@ -1,11 +1,14 @@
 import RiotServiceClient, { LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest, Item, ItemSignatures } from "./RiotServiceClient"
 import { addLoss, addMatch, addWin, getMatches, resetWinrates } from "./db-manager/dbm";
 
-const MAX_MATCHES = 400
+export const MAX_MATCHES = 400
 
+/**
+ * This class requests player and match data from the RiotServiceClient until enough data has been found, based on the MAX_MATCHES variable.
+ */
 export default class DataGathering {
     // could make matches/summids/puuids objects that have a "checked" property
-    private _matches: string[] = []
+    private _matchesQueue: string[] = []
 
     private _checkedMatches: string[] = []
 
@@ -20,7 +23,7 @@ export default class DataGathering {
     private _apiClient: RiotServiceClient
 
     private _currentVersion: string
-    
+
     private static _instance: DataGathering;
 
     private constructor(apiClient: RiotServiceClient, currentVersion: string, matches: string[]) {
@@ -29,17 +32,29 @@ export default class DataGathering {
         this._checkedMatches = matches
     }
 
-    private static async create() {
-        const apiClient: RiotServiceClient = new RiotServiceClient()
+    /**
+     * Needed because async functions can not be called in the constructor.
+     * fakeClient used for testing.
+     */
+    private static async create(fakeClient?: Partial<RiotServiceClient>) {
+        const apiClient: RiotServiceClient = fakeClient as RiotServiceClient || new RiotServiceClient()
         const currentVersion: string = (await apiClient.getCurrentVersion()).split(".", 2).join(".")
-        const checkedMatches: string[] = await getMatches(currentVersion) // 
+        const checkedMatches: string[] = await getMatches(currentVersion)
         // turns patch into only the first 2 numbers because match API returns extra numbers
         this._instance = new DataGathering(apiClient, currentVersion, checkedMatches)
     }
 
-    static async getInstance(): Promise<DataGathering> {
+    /**
+     * Utilizes the Singleton pattern to keep only one existing DataGathering client at a time.
+     * One client is optimal so it can persist the puuid and summonerId queues.
+     * If the server goes down, the checkedMatches are reloaded, but the checked puuids and summonerIds are not reloaded.
+     * This is because checked puuids and checked summonerIds can have new matches since they were checked, so disregarding them could
+     * mean wasted matches.
+     * @returns a promise of a new or existing DataGathering client instance.
+     */
+    static async getInstance(fakeClient?: Partial<RiotServiceClient>): Promise<DataGathering> {
         if (!this._instance) {
-            await this.create()
+            await this.create(fakeClient)
         }
         return this._instance
     }
@@ -63,10 +78,6 @@ export default class DataGathering {
                 this._summonerIdQueue.push(summoner.summonerId)
             }
         })
-
-        if (this._summonerIdQueue.length == 0) {
-
-        }
     }
 
     /**
@@ -82,52 +93,59 @@ export default class DataGathering {
         } else if (this._summonerIdQueue.length > 0) {
             // instead of awaiting the puuid, could create a player object that holds summID AND puuid
             // can do this by making the getPUUID function return an object with those params instead of just the puuid.
-            while (this._summonerIdQueue.length > 0 && this._checkedPuuids.includes(await this._apiClient.getPUUID(this._summonerIdQueue[0]))) {
+            let puuidFromSummonerId = await this._apiClient.getPUUID(this._summonerIdQueue[0])
+            while (this._checkedPuuids.includes(puuidFromSummonerId)) {
                 this._checkedSummonerIds.push(this._summonerIdQueue.shift()!)
-                console.log("checked summoners:" + this._checkedSummonerIds)
+                if (this._summonerIdQueue.length === 0) {
+                    //get new batch of summIds from new tier/division
+                    return
+                }
+                puuidFromSummonerId = await this._apiClient.getPUUID(this._summonerIdQueue[0])
             }
-            if (this._summonerIdQueue.length === 0) {
-                //get new batch of summIds from a new tier/division
-            } else {
-                const summonerToAnalyze = this._summonerIdQueue.shift()
-                matches = await this._apiClient.getPlayerMatches(await this._apiClient.getPUUID(summonerToAnalyze!))
-                console.log(matches)
-                this._checkedSummonerIds.push(summonerToAnalyze!)
-            }
-            
-        } else { // possibility of infinite loop if we can't get any new summids/puuids
+            const summonerToAnalyze = this._summonerIdQueue.shift()
+            matches = await this._apiClient.getPlayerMatches(puuidFromSummonerId)
+            console.log("new matches from summId")
+            this._checkedSummonerIds.push(summonerToAnalyze!)
+            this._checkedPuuids.push(puuidFromSummonerId)
+
+        } else {
             await this.getPlayers()
-            // if no new
+            if (this._summonerIdQueue.length === 0) {
+                return
+            }
             await this.getMatches()
             return
         }
         matches.forEach(match => {
-            if (!this._matches.includes(match) && !this._checkedMatches.includes(match)) {
-                console.log("pushing match" + match)
-                this._matches.push(match)
+            if (!this._checkedMatches.includes(match)) {
+                console.log("pushing match " + match)
+                this._matchesQueue.push(match)
             }
         })
     }
 
     /**
-     * Analyzes matches until MAX_MATCHES have been checked
+     * Analyzes matches until MAX_MATCHES have been checked or there are no more players around Challenger rank to analyze
      */
     async analyzeMatches() {
-        while (this._matches.length > 0 && (this._checkedMatches.length < MAX_MATCHES)) {
-            console.log(`are currently on ${this._matches.length}`)
-            const matchToCheck = this._matches.shift()
+        while (this._matchesQueue.length > 0 && (this._checkedMatches.length < MAX_MATCHES)) {
+            console.log(`are currently on ${this._matchesQueue.length}`)
+            const matchToCheck = this._matchesQueue.shift()
             await this.analyzeMatch(matchToCheck!)
         }
 
         if (this._checkedMatches.length < MAX_MATCHES) {
             await this.getMatches()
-            await this.analyzeMatches()
+            if (this._matchesQueue.length === 0) {
+                console.log("no more matches to check")
+            } else {
+                await this.analyzeMatches()
+            }
         } else {
             console.log("checked enough matches")
         }
     }
 
-    // adds match wins/losses for each participant's champion and their items into db
     /**
      * If this match is on the most recent game version, analyze each participant's champion and items and add data to db.
      * If any of the other 9 participants haven't yet been added to the queue or checked, add them to the puuidQueue.
@@ -144,26 +162,20 @@ export default class DataGathering {
             } else {
                 return
             }
-            
+
         }
 
-        matchResponse.metadata.participants.forEach(participantId => {
-            if (!this._puuidQueue.includes(participantId) && !this._checkedPuuids.includes(participantId)) {
-                this._puuidQueue.push(participantId)
-            }
-        })
-
-        const { participants }: {participants: MatchParticipant[]} = info
+        const { participants }: { participants: MatchParticipant[] } = info
 
         // first 5 participants in the list are always the winners
-        const winners: MatchParticipant[] = participants.slice(0,5)
+        const winners: MatchParticipant[] = participants.slice(0, 5)
         const losers: MatchParticipant[] = participants.slice(5)
 
         for (const winner of winners) {
             // dont await these, analyzeMatch gets awaited so there won't be a same champ/item combo between winners and losers
             this.updateWinrate(winner, addWin)
         }
-        
+
         for (const loser of losers) {
             this.updateWinrate(loser, addLoss)
         }
@@ -196,7 +208,7 @@ export default class DataGathering {
      * @param fn either addWin or addLoss
      */
     async updateWinrate(player: MatchParticipant, addWinOrLoss: (...args: any[]) => Promise<void>) {
-        if (!this._puuidQueue.includes(player.puuid)) {
+        if (!this._puuidQueue.includes(player.puuid) && !this._checkedPuuids.includes(player.puuid)) {
             this._puuidQueue.push(player.puuid)
         }
 
@@ -240,6 +252,13 @@ export default class DataGathering {
      */
     get getCheckedMatches(): string[] {
         return [...this._checkedMatches]
+    }
+
+    /**
+     * Used for limiting unecessary extra players?
+     */
+    get puuidQueueLength(): number {
+        return this._puuidQueue.length
     }
 
     /**
