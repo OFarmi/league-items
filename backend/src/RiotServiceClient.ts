@@ -253,31 +253,31 @@ export default class RiotServiceClient {
         return response.data
     }
 
-    async getChampionList(patch: string): Promise<string[]> {
-        const response: AxiosResponse = await this._axios_cdn.get(`/${patch + ".1"}/data/en_US/champion.json`)
+    async getChampionList(version: string): Promise<string[]> {
+        const response: AxiosResponse = await this._axios_cdn.get(`/${version + ".1"}/data/en_US/champion.json`)
         return Object.getOwnPropertyNames(response.data.data)
     }
 
-    async getItemCodeList(patch: string): Promise<string[]> {
-        const response: AxiosResponse = await this._axios_cdn.get(`/${patch + ".1"}/data/en_US/item.json`)
+    async getItemCodeList(version: string): Promise<string[]> {
+        const response: AxiosResponse = await this._axios_cdn.get(`/${version + ".1"}/data/en_US/item.json`)
         return Object.getOwnPropertyNames(response.data.data)
     }
 
-    async getItemNameList(patch: string): Promise<string[][]> {
-        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
+    async getItemNameList(version: string): Promise<string[][]> {
+        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${version + ".1"}/data/en_US/item.json`)
         return Object.entries(response.data.data).map(([k, v]) => [k, v.name])
     }
 
-    async getItemData(patch: string, item: number): Promise<Item> {
-        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
+    async getItemData(version: string, item: number): Promise<Item> {
+        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${version + ".1"}/data/en_US/item.json`)
         const reply = response.data.data[item]
         reply.id = item //adds the id prop to the returned object
 
         return reply
     }
 
-    async getItemsData(patch: string): Promise<ItemSignatures> {
-        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${patch + ".1"}/data/en_US/item.json`)
+    async getItemsData(version: string): Promise<ItemSignatures> {
+        const response: AxiosResponse<ItemResponse> = await this._axios_cdn.get<ItemResponse>(`/${version + ".1"}/data/en_US/item.json`)
         return response.data.data
     }
 }

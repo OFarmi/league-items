@@ -110,6 +110,7 @@ export default class DataGathering {
 
         } else {
             await this.getPlayers()
+            //no more Challenger players to get
             if (this._summonerIdQueue.length === 0) {
                 return
             }
@@ -155,14 +156,14 @@ export default class DataGathering {
         const matchResponse: MatchDataResponse = await this._apiClient.getMatchData(matchId)
 
         const { info } = matchResponse
-        const patch = info.gameVersion.split(".", 2).join(".")
-        if (patch !== this._currentVersion || info.queueId != 420) {
-            if (patch > this._currentVersion) {
-                this.updateVersion(patch)
+        const version = info.gameVersion.split(".", 2).join(".")
+        if (info.queueId != 420) return
+        if (version !== this._currentVersion) {
+            if (version > this._currentVersion) {
+                await this.updateVersion(version)
             } else {
                 return
             }
-
         }
 
         const { participants }: { participants: MatchParticipant[] } = info
@@ -180,7 +181,7 @@ export default class DataGathering {
             this.updateWinrate(loser, addLoss)
         }
         this._checkedMatches.push(matchId)
-        addMatch(matchId, patch)
+        addMatch(matchId, version)
     }
 
     /**
