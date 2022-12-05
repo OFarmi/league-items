@@ -1,5 +1,6 @@
-import RiotServiceClient, { LeagueEntry, SummonerIdRequest } from "./RiotServiceClient";
-import DataGathering, {MAX_MATCHES} from "./DataGathering";
+import RiotServiceClient, { Item, LeagueEntry, MatchDataResponse, MatchParticipant, SummonerIdRequest } from "./RiotServiceClient";
+import DataGathering, { MAX_MATCHES } from "./DataGathering";
+import * as dbm from "./db-manager/dbm";
 
 
 const clearInstance = (instance: DataGathering) => {
@@ -8,6 +9,7 @@ const clearInstance = (instance: DataGathering) => {
     instance['_puuidQueue'] = []
     instance['_summonerIdQueue'] = []
     instance['_matchesQueue'] = []
+    instance['_checkedMatches'] = []
 }
 
 describe('DataGathering', () => {
@@ -16,6 +18,7 @@ describe('DataGathering', () => {
     beforeAll(async () => {
         instance = await DataGathering.getInstance(apiClient)
     })
+    //using a Partial lets us ignore the constructor
     const apiClient: Partial<RiotServiceClient> = {
         async getCurrentVersion(): Promise<string> {
             return Promise.resolve("1.1")
@@ -29,6 +32,12 @@ describe('DataGathering', () => {
         },
         async getPlayerMatches(puuid: string): Promise<string[]> {
             return Promise.resolve([Math.random().toString(36).slice(2)])
+        },
+        async getMatchData(matchId: string): Promise<MatchDataResponse> {
+            return Promise.resolve({} as MatchDataResponse)
+        },
+        async getItemData(version: string, item: number): Promise<Item> {
+            return Promise.resolve({} as Item)
         }
     }
 
@@ -42,7 +51,7 @@ describe('DataGathering', () => {
 
     })
     describe('getPlayers', () => {
-        
+
         afterEach(() => {
             instance['_checkedSummonerIds'] = []
         })
@@ -78,7 +87,7 @@ describe('DataGathering', () => {
         })
     })
     describe('getMatches', () => {
-        
+
         beforeEach(() => {
             clearInstance(instance)
             jest.clearAllMocks()
@@ -152,11 +161,123 @@ describe('DataGathering', () => {
             expect(getPlayerMatchesSpy).not.toHaveBeenCalled()
         })
     })
+    describe('analyzeMatch', () => {
+
+        //mock updateVersion and updateWinrate to do nothing for these tests, or create a mock db instance through singleton or DI
+        afterEach(() => {
+            jest.clearAllMocks()
+            clearInstance(instance)
+        })
+        it('should update the winrate of the client if given a more recent version', async () => {
+            const matchDataResponseBiggerSecondVersionNumber = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "1.2",
+                    queueId: 420,
+                    participants: []
+                }
+            }
+            const matchDataResponseBiggerFirstVersionNumber = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "2.1",
+                    queueId: 420,
+                    participants: []
+                }
+            }
+            jest.spyOn(instance, 'updateWinrate').mockImplementationOnce(() => Promise.resolve())
+            const updateVersionSpy = jest.spyOn(instance, 'updateVersion').mockImplementation(() => Promise.resolve())
+            jest.spyOn(apiClient, 'getMatchData').mockImplementationOnce(() => Promise.resolve(matchDataResponseBiggerFirstVersionNumber)).mockImplementationOnce(() => Promise.resolve(matchDataResponseBiggerSecondVersionNumber))
+            jest.spyOn(dbm, 'addMatch').mockImplementation(() => Promise.resolve())
+            await instance.analyzeMatch(Math.random().toString(36).slice(2))
+            await instance.analyzeMatch(Math.random().toString(36).slice(2))
+            expect(updateVersionSpy).toHaveBeenCalledTimes(2)
+        })
+        it('should still analyze the match if it is on a more recent version', async () => {
+            const matchDataResponseMoreRecentVersion = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "1.2",
+                    queueId: 420,
+                    participants: [{} as MatchParticipant]
+                }
+            }
+            const updateWinrateSpy = jest.spyOn(instance, 'updateWinrate').mockImplementationOnce(() => Promise.resolve())
+            const addMatchSpy = jest.spyOn(dbm, 'addMatch').mockImplementation(() => Promise.resolve())
+            jest.spyOn(apiClient, 'getMatchData').mockImplementationOnce(() => Promise.resolve(matchDataResponseMoreRecentVersion))
+            await instance.analyzeMatch(Math.random().toString(36).slice(2))
+            expect(updateWinrateSpy).toHaveBeenCalled()
+            expect(addMatchSpy).toHaveBeenCalled()
+
+        })
+        it('should ignore non-ranked matches regardless of game version', async () => {
+            const matchDataResponseEarlierVersion = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "0.9",
+                    queueId: 440,
+                    participants: []
+                }
+            }
+            const matchDataResponseSameVersion = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "1.1",
+                    queueId: 440,
+                    participants: []
+                }
+            }
+            const matchDataResponseMoreRecentVersion = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "1.2",
+                    queueId: 450,
+                    participants: []
+                }
+            }
+            jest.spyOn(apiClient, 'getMatchData').mockImplementationOnce(() => Promise.resolve(matchDataResponseSameVersion))
+                .mockImplementationOnce(() => Promise.resolve(matchDataResponseMoreRecentVersion))
+                .mockImplementationOnce(() => Promise.resolve(matchDataResponseEarlierVersion))
+            const updateWinrateSpy = jest.spyOn(instance, 'updateWinrate')
+            const updateVersionSpy = jest.spyOn(instance, 'updateVersion')
+            await instance.analyzeMatch(Math.random().toString(36).slice(2))
+            await instance.analyzeMatch(Math.random().toString(36).slice(2))
+            expect(updateWinrateSpy).not.toHaveBeenCalled()
+            expect(updateVersionSpy).not.toHaveBeenCalled()
+        })
+        it('should ignore matches from a previous version', async () => {
+            const matchDataResponseSmallerFirstVersionNumber = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "0.9",
+                    queueId: 420,
+                    participants: []
+                }
+            }
+            const matchDataResponseSmallerSecondVersionNumber = {
+                metadata: { participants: [] },
+                info: {
+                    gameVersion: "1.0",
+                    queueId: 420,
+                    participants: []
+                }
+            }
+
+            jest.spyOn(apiClient, 'getMatchData').mockImplementationOnce(() => Promise.resolve(matchDataResponseSmallerFirstVersionNumber))
+                .mockImplementationOnce(() => Promise.resolve(matchDataResponseSmallerSecondVersionNumber))
+            const updateVersionSpy = jest.spyOn(instance, 'updateVersion')
+            const updateWinrateSpy = jest.spyOn(instance, 'updateWinrate')
+            await instance.analyzeMatch(Math.random().toString(36).slice(2))
+            await instance.analyzeMatch(Math.random().toString(36).slice(2))
+            expect(updateVersionSpy).not.toHaveBeenCalled()
+            expect(updateWinrateSpy).not.toHaveBeenCalled()
+        })
+    })
     describe('analyzeMatches', () => {
 
         let analyzeMatchSpy: jest.SpyInstance
-        beforeAll(() => {
-            analyzeMatchSpy = jest.spyOn(instance, 'analyzeMatch').mockImplementation(() => Promise.resolve())
+        beforeEach(() => {
+            analyzeMatchSpy = jest.spyOn(instance, 'analyzeMatch').mockImplementation((matchId: string) => Promise.resolve())
         })
         afterEach(() => {
             jest.clearAllMocks()
@@ -190,7 +311,64 @@ describe('DataGathering', () => {
             expect(getMatchesSpy).not.toHaveBeenCalled()
         })
         it('calls analyzeMatch if there are matches to analyze and checked matches is less than MAX_MATCHES', async () => {
-            
+            const matchToAnalyze = Math.random().toString(36).slice(2)
+            instance['_matchesQueue'].push(matchToAnalyze)
+            jest.spyOn(instance, 'getMatches').mockImplementationOnce(() => Promise.resolve())
+            await instance.analyzeMatches()
+            expect(analyzeMatchSpy).toHaveBeenCalledWith(matchToAnalyze)
+        })
+    })
+    describe('updateWinrate', () => {
+
+        afterEach(() => {
+            jest.clearAllMocks()
+            clearInstance(instance)
+        })
+
+        it('should not add the given participants puuid to the queue if their puuid is already in the queue or checked puuids list', async () => {
+            const puuidInQueue = Math.random().toString(36).slice(2)
+            const checkedPuuid = Math.random().toString(36).slice(2)
+            const matchParticipantInQueue = { puuid: puuidInQueue } as MatchParticipant
+            const alreadyCheckedMatchParticipant = { puuid: checkedPuuid } as MatchParticipant
+            instance['_puuidQueue'].push(puuidInQueue)
+            instance['_checkedPuuids'].push(checkedPuuid)
+            const initialQueueSize = instance['_puuidQueue'].length
+            await instance.updateWinrate(matchParticipantInQueue, () => Promise.resolve())
+            await instance.updateWinrate(alreadyCheckedMatchParticipant, () => Promise.resolve())
+            expect(instance['_puuidQueue'].length).toEqual(initialQueueSize)
+        })
+
+        it('calls getItemData again when one of the participants items are an ornn upgraded item', async () => {
+            const matchParticipant = {
+                puuid: Math.random().toString(36).slice(2),
+                item0: 1,
+                teamPosition: ""
+            } as MatchParticipant
+            const addWinOrLoss = async () => {
+                Promise.resolve()
+            }
+            const getItemDataSpy = jest.spyOn(apiClient, 'getItemData').mockImplementationOnce(() => Promise.resolve({ description: "mythic", requiredAlly: "Ornn", from: [""] } as Item))
+            await instance.updateWinrate(matchParticipant, addWinOrLoss)
+            expect(getItemDataSpy).toHaveBeenCalledTimes(2)
+        })
+        it('only calls the addWinOrLoss function once per item', async () => {
+            const matchParticipant = {
+                puuid: Math.random().toString(36).slice(2),
+                item0: 1,
+                item1: 2,
+                item2: 3,
+                teamPosition: ""
+            } as MatchParticipant
+            const addWinOrLoss = async () => {
+                Promise.resolve()
+            }
+            const getItemDataSpy = jest.spyOn(apiClient, 'getItemData').mockImplementationOnce(() => Promise.resolve({ description: "mythic", requiredAlly: "Ornn", from: [""] } as Item))
+                .mockImplementationOnce(() => Promise.resolve({ description: "mythic" } as Item))
+                .mockImplementationOnce(() => Promise.resolve({ description: "", from: [""], tags: [""] } as Item))
+            const addWinOrLossSpy = jest.fn(addWinOrLoss)
+
+            await instance.updateWinrate(matchParticipant, addWinOrLossSpy)
+            expect(addWinOrLossSpy).toHaveBeenCalledTimes(3)
         })
     })
 })
