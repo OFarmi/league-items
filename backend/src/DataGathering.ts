@@ -38,9 +38,9 @@ export default class DataGathering {
      */
     private static async create(fakeClient?: Partial<RiotServiceClient>) {
         const apiClient: RiotServiceClient = fakeClient as RiotServiceClient || new RiotServiceClient()
+        // turns version into only the first 2 numbers because match API returns extra numbers
         const currentVersion: string = (await apiClient.getCurrentVersion()).split(".", 2).join(".")
         const checkedMatches: string[] = await getMatches(currentVersion)
-        // turns patch into only the first 2 numbers because match API returns extra numbers
         this._instance = new DataGathering(apiClient, currentVersion, checkedMatches)
     }
 
