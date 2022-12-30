@@ -1,6 +1,3 @@
-import DataGathering from "./DataGathering";
-import { addChamp, addLoss, addWin, addItem, getWinrates, totalMatches, getMatches } from "./db-manager/dbm";
-import { itemDataHandler } from "./LeagueItemRequestHandler";
 import RiotServiceClient, { LeagueEntry, Item, MatchDataResponse, ItemSignatures } from "./RiotServiceClient"
 
 
@@ -106,7 +103,6 @@ describe('RiotServiceClient', () => {
         })
         it('can get data of a given item', async () => {
             const resolvedItem = await apiClient.getItemData(patch, 1004)
-            console.log(resolvedItem)
             const fakeBoots: Item = {
                 id: 1001,
                 name: "Boots",
